@@ -59,9 +59,6 @@ int sysctl_tcp_limit_output_bytes __read_mostly = 131072;
  */
 int sysctl_tcp_tso_win_divisor __read_mostly = 3;
 
-int sysctl_tcp_mtu_probing __read_mostly = 0;
-int sysctl_tcp_base_mss __read_mostly = TCP_BASE_MSS;
-
 /* By default, RFC2861 behavior.  */
 int sysctl_tcp_slow_start_after_idle __read_mostly = 1;
 
@@ -1077,6 +1074,11 @@ int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len,
 	if (nsize < 0)
 		nsize = 0;
 
+	if (unlikely((sk->sk_wmem_queued >> 1) > sk->sk_sndbuf)) {
+		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPWQUEUETOOBIG);
+		return -ENOMEM;
+	}
+
 	if (skb_unclone(skb, GFP_ATOMIC))
 		return -ENOMEM;
 
@@ -1239,8 +1241,7 @@ static inline int __tcp_mtu_to_mss(struct sock *sk, int pmtu)
 	mss_now -= icsk->icsk_ext_hdr_len;
 
 	/* Then reserve room for full set of TCP options and 8 bytes of data */
-	if (mss_now < 48)
-		mss_now = 48;
+	mss_now = max(mss_now, sock_net(sk)->ipv4.sysctl_tcp_min_snd_mss);
 	return mss_now;
 }
 
@@ -1279,11 +1280,12 @@ void tcp_mtup_init(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
+	struct net *net = sock_net(sk);
 
-	icsk->icsk_mtup.enabled = sysctl_tcp_mtu_probing > 1;
+	icsk->icsk_mtup.enabled = net->ipv4.sysctl_tcp_mtu_probing > 1;
 	icsk->icsk_mtup.search_high = tp->rx_opt.mss_clamp + sizeof(struct tcphdr) +
 			       icsk->icsk_af_ops->net_header_len;
-	icsk->icsk_mtup.search_low = tcp_mss_to_mtu(sk, sysctl_tcp_base_mss);
+	icsk->icsk_mtup.search_low = tcp_mss_to_mtu(sk, net->ipv4.sysctl_tcp_base_mss);
 	icsk->icsk_mtup.probe_size = 0;
 }
 EXPORT_SYMBOL(tcp_mtup_init);
@@ -2211,7 +2213,7 @@ u32 __tcp_select_window(struct sock *sk)
 }
 
 /* Collapses two adjacent SKB's during retransmission. */
-static void tcp_collapse_retrans(struct sock *sk, struct sk_buff *skb)
+static bool tcp_collapse_retrans(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *next_skb = tcp_write_queue_next(sk, skb);
@@ -2222,12 +2224,16 @@ static void tcp_collapse_retrans(struct sock *sk, struct sk_buff *skb)
 
 	BUG_ON(tcp_skb_pcount(skb) != 1 || tcp_skb_pcount(next_skb) != 1);
 
+	if (next_skb_size) {
+		if (next_skb_size <= skb_availroom(skb))
+			skb_copy_bits(next_skb, 0, skb_put(skb, next_skb_size),
+				      next_skb_size);
+		else if (!tcp_skb_shift(skb, next_skb, 1, next_skb_size))
+			return false;
+	}
 	tcp_highest_sack_combine(sk, next_skb, skb);
 
 	tcp_unlink_write_queue(next_skb, sk);
-
-	skb_copy_from_linear_data(next_skb, skb_put(skb, next_skb_size),
-				  next_skb_size);
 
 	if (next_skb->ip_summed == CHECKSUM_PARTIAL)
 		skb->ip_summed = CHECKSUM_PARTIAL;
@@ -2254,6 +2260,7 @@ static void tcp_collapse_retrans(struct sock *sk, struct sk_buff *skb)
 	tcp_adjust_pcount(sk, next_skb, tcp_skb_pcount(next_skb));
 
 	sk_wmem_free_skb(sk, next_skb);
+	return true;
 }
 
 /* Check if coalescing SKBs is legal. */
@@ -2261,14 +2268,11 @@ static bool tcp_can_collapse(const struct sock *sk, const struct sk_buff *skb)
 {
 	if (tcp_skb_pcount(skb) > 1)
 		return false;
-	/* TODO: SACK collapsing could be used to remove this condition */
-	if (skb_shinfo(skb)->nr_frags != 0)
-		return false;
 	if (skb_cloned(skb))
 		return false;
 	if (skb == tcp_send_head(sk))
 		return false;
-	/* Some heurestics for collapsing over SACK'd could be invented */
+	/* Some heuristics for collapsing over SACK'd could be invented */
 	if (TCP_SKB_CB(skb)->sacked & TCPCB_SACKED_ACKED)
 		return false;
 
@@ -2303,16 +2307,12 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *to,
 
 		if (space < 0)
 			break;
-		/* Punt if not enough space exists in the first SKB for
-		 * the data in the second
-		 */
-		if (skb->len > skb_availroom(to))
-			break;
 
 		if (after(TCP_SKB_CB(skb)->end_seq, tcp_wnd_end(tp)))
 			break;
 
-		tcp_collapse_retrans(sk, to);
+		if (!tcp_collapse_retrans(sk, to))
+			break;
 	}
 }
 
