@@ -163,6 +163,8 @@ static const struct usb_device_id ath3k_blist_tbl[] = {
 #define USB_REQ_DFU_DNLOAD	1
 #define BULK_SIZE		4096
 #define FW_HDR_SIZE		20
+#define TIMEGAP_USEC_MIN	50
+#define TIMEGAP_USEC_MAX	100
 
 static int ath3k_load_firmware(struct usb_device *udev,
 				const struct firmware *firmware)
@@ -194,6 +196,9 @@ static int ath3k_load_firmware(struct usb_device *udev,
 	pipe = usb_sndbulkpipe(udev, 0x02);
 
 	while (count) {
+		/* workaround the compatibility issue with xHCI controller*/
+		usleep_range(TIMEGAP_USEC_MIN, TIMEGAP_USEC_MAX);
+
 		size = min_t(uint, count, BULK_SIZE);
 		memcpy(send_buf, firmware->data + sent, size);
 
@@ -288,10 +293,13 @@ static int ath3k_load_fwfile(struct usb_device *udev,
 	sent += size;
 	count -= size;
 
-	while (count) {
-		size = min_t(uint, count, BULK_SIZE);
-		pipe = usb_sndbulkpipe(udev, 0x02);
+	pipe = usb_sndbulkpipe(udev, 0x02);
 
+	while (count) {
+		/* workaround the compatibility issue with xHCI controller*/
+		usleep_range(TIMEGAP_USEC_MIN, TIMEGAP_USEC_MAX);
+
+		size = min_t(uint, count, BULK_SIZE);
 		memcpy(send_buf, firmware->data + sent, size);
 
 		err = usb_bulk_msg(udev, pipe, send_buf, size,
