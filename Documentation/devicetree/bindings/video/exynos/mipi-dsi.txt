@@ -1,0 +1,167 @@
+* Samsung Exynos MIPI-DSI bindings
+
+Properties for MIPI-DSI node ::
+===============================
+- compatible: should be "samsung,exynos-mipi"
+
+- reg: should contain mipi-dsi physical address location and length.
+
+- interrupts: should contain mipi-dsi interrupt number
+
+- enabled: Describes whether MIPI DSI got enabled in uboot
+
+- mipi-lcd: phandle to lcd specific information. It can be anything
+	specific to lcd driver.
+
+- mipi-phy: phandle to D-PHY node.
+
+- mipi-config: subnode for mipi config information
+	- auto_flush: enable or disable Auto flush of MD FIFO using VSYNC pulse
+	- eot_disable: enable or disable EoT packet in HS mode
+	- auto_vertical_cnt: specifies auto vertical count mode.
+		In Video mode, the vertical line transition uses line counter
+		configured by VSA, VBP, and Vertical resolution. If this bit is
+		set to '1', the line counter does not use VSA and VBP registers.
+		In command mode, this property is ignored.
+	- hse: set horizontal sync event mode.
+		In VSYNC pulse and Vporch area,	MIPI DSI master transfers only
+		HSYNC start packet to MIPI DSI slave at MIPI DSI spec1.1r02.
+		This bit transfers HSYNC end packet in VSYNC pulse and Vporch
+		area. In command mode, this property is ignored.
+	- hfp: specifies HFP disable mode.
+		If this property is set, DSI master ignores HFP area in
+		VIDEO mode. In command mode, this property is ignored.
+	- hbp: specifies HBP disable mode.
+		If this property is set, DSI master ignores HBP area in
+		VIDEO mode. In command mode, this property is ignored.
+	- hsa: specifies HSA disable mode.
+		If this property is set, DSI master ignores HSA area in
+		VIDEO mode. In command mode, this property is ignored.
+	- cmd_allow: specifies the number of horizontal lines, where command
+		packet transmission is allowed after Stable VFP period.
+	- e_interface: specifies interface to be used.(CPU or RGB interface)
+	- e_virtual_ch: specifies virtual channel number that main or
+		sub display uses.
+	- e_pixel_format: specifies pixel stream format for main or sub display.
+	- e_burst_mode: selects Burst mode in Video mode.
+		In Non-burst mode, RGB data area is filled with RGB data
+		and NULL packets, according to input bandwidth of RGB interface.
+		In Burst mode, RGB data area is filled with RGB data only.
+	- e_no_data_lane: specifies data lane count to be used by Master.
+	- e_byte_clk: select byte clock source. (it must be DSIM_PLL_OUT_DIV8)
+		DSIM_EXT_CLK_DIV8 and DSIM_EXT_CLK_BYPASSS are not supported.
+	- pll_stable_time: specifies the PLL Timer for stability of the
+		generated clock(System clock cycle base). If the timer value
+		goes to 0x00000000, the clock stable bit of status and interrupt
+		register is set.
+	- esc_clk: specifies escape clock frequency for getting the escape clock
+		prescaler value.
+	- stop_holding_cnt: specifies the interval value between transmitting
+		read packet(or write "set_tear_on" command) and BTA request.
+		after transmitting read packet or write "set_tear_on" command,
+		BTA requests to D-PHY automatically. this counter value
+		specifies the interval between them.
+	- bta_timeout: specifies the timer for BTA.
+		this register specifies time out from BTA request to change
+		the direction with respect to Tx escape clock.
+	- rx_timeout: specifies the timer for LP Rx mode timeout.
+		this register specifies time out on how long RxValid deasserts,
+		after RxLpdt asserts with respect to Tx escape clock.
+		- RxValid specifies Rx data valid indicator.
+		- RxLpdt specifies an indicator that D-PHY is under RxLpdt mode.
+		- RxValid and RxLpdt specifies signal from D-PHY.
+
+- panel-info: timing information from the panel used.
+	- lcd-htiming : xres, left_margin, right_margin, hsync-len info
+	- lcd-vtiming : yres, upper_margin, lower_margin, vsync-len info
+
+Properties for D-PHY node ::
+=============================
+	Instead of passing D-PHY related callbacks as part of platform data,
+we can pass the phy nodes to the mipi driver. Depending on the type of PHY
+settings, we can implement multiple PHY node types and corresponding
+enable/disable/reset callbacks in the driver itself. Currently we support
+only one type of PHY node.
+
+D-PHY node type1:
+------------------
+- compatible: "samsung,exynos-mipi-phy-type1"
+- reg_enable_dphy: should contain physical address location of
+	D-PHY enable register
+- mask_enable_dphy: should contain the mask for D-PHY enable register
+- reg_reset_dsim: should contain physical address location of
+	D-PHY DSIM reset register
+- mask_reset_dsim: should contain the mask for D-PHY DSIM reset register
+
+MIPI-LCD node ::
+=================
+	Apart from the following three properties, driver specific
+properties can be sent through this node. The following example sends
+some more properties for driver's use.
+
+- lcd-name: name of the device to use with this device
+- id: id of device to be registered (default -1 in case not specified)
+- bus-id: bus id for identifing connected bus and this bus id should be
+	same as id of mipi_dsim_device (default -1 incase not specified)
+
+Example:
+--------
+	mipi_lcd: mipi-lcd@toshiba {
+		lcd-name = "tc358764";
+		id = <0>;
+		enabled = <1>;
+		reset-delay = <120>;
+		power-on-delay = <25>;
+		power-off-delay = <200>;
+		gpio-poweron = <&gpx1 5 0 0 0>;
+	};
+
+	mipi_dsim_phy: mipi-phy@exynos5250 {
+		compatible = "samsung-exynos,mipi-phy-type1";
+		reg_enable_dphy = <0x10040714>;
+		mask_enable_dphy = <0x00000001>;
+		reg_reset_dsim = <0x10040714>;
+		mask_reset_dsim = <0x00000004>;
+	};
+
+	mipi_dsi_tc358764: lcd_panel_tc358764 {
+		lcd-htiming = <24 24 2 800>;
+		lcd-vtiming = <1 13 2 1280>;
+	};
+
+	mipi {
+		compatible = "samsung,exynos-mipi";
+		reg = <0x14500000 0x10000>;
+		interrupts = <0 82 0>;
+
+		mipi-lcd = <&mipi_lcd>;
+		mipi-phy = <&mipi_dsim_phy>;
+		enabled = <0>;
+
+		panel-info = <&lcd_mipi_dsi_tc358764>;
+		mipi-config {
+			e_interface = <1>;
+			e_pixel_format = <7>;
+			auto_flush = <0>;
+			eot_disable = <0>;
+			auto_vertical_cnt = <0>;
+			hse = <0>;
+			hfp = <0>;
+			hbp = <0>;
+			hsa = <0>;
+			e_no_data_lane = <3>;
+			e_byte_clk = <0>;
+			e_burst_mode = <3>;
+			p = <3>;
+			m = <115>;
+			s = <1>;
+			pll_stable_time = <500>;
+			esc_clk = <400000>;
+			stop_holding_cnt =<0x0f>;
+			bta_timeout = <0xff>;
+			rx_timeout = <0xffff>;
+			e_virtual_ch = <0>;
+			cmd_allow = <0xf>;
+		};
+
+	};

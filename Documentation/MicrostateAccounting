@@ -1,0 +1,189 @@
+			Microstate Accounting
+			---------------------
+
+Microstate accounting provides a way to have accurate CPU and wait
+time for tasks and interrupts.  This provides a number of advantages
+over standard accounting:
+
+* Standard accounting is inaccurate.  Normal accounting is only done
+  at timer ticks.  The task running when the tick occurs is assigned
+  the entire timeslice worth of CPU, no matter how much CPU it
+  actually used.  This means that the reported values can be very
+  inaccurate, especially for operations driven by timers, since they
+  will run right after a timer tick.
+
+* Standard accounting provides no information about where the task
+  has spent time besides running.
+
+* Standard accounting provides no information about time spend in
+  interrupts
+
+Microstate accounting provides accurate information on time used by
+the task by tying into the places where task switches and interrupts
+occur.  It counts time the task spent running in userland and in the
+kernel, and it counts the time the task spends waiting on various
+things.  It also counts time spent running in interrupts on a
+per-interrupt basis.
+
+Note that all times reported by Microstate Accounting are in nanoseconds.
+
+
+Enabling
+--------
+
+To enable Microstate Accouting, enable the MICROSTATE_ACCT config,
+generally in the debug menu of the config.  You will then be prompted
+to choose a clocksource.  The generic sched_clock clocksource is a
+fairly safe choice.  You may have a per-architecture clock (like the
+TSC), only enable that if you know it is a stable clocksource on all
+systems on which the kernel will be used.
+
+
+Problems
+--------
+
+The big issue with Microstate Accouting is the overhead.  Every
+syscall, every interrupt, every task switch, etc. has a little
+overhead added to account for the time.  So it is less efficient than
+normal accouting.  This has been measured on some systems and is
+generally substantially less than a percent, but it is a lot more than
+just accouting in the timer tick.
+
+
+Uses
+----
+
+So why would you want to use this feature?  A couple of things have
+been done with this feature already:
+
+ Accurate, detailed profiling.  With Microstate Accouting, profiling
+ can be done on a time basis and it will be very accurate.  In
+ addition, information about tie spent waiting, paging, etc. can be
+ collected to look for issues besides just CPU hotspots.  And a single
+ call to a function is enough to do a reasonable profile on it.
+
+ CPU usage watching.  Along with setitimer() and SIGVTALRM, or an
+ external thread watching, a framework can be built to start an
+ operation and make sure it doesn't use more CPU than expected, and
+ abort the operation if it does.  This is simply not possible with
+ standard accouting, too many false positives happen where a thread has
+ used very little CPU but since it happened to be running during a
+ couple of timer tick, it gets a lot of CPU reported.
+
+In addition to this, because information about waiting and paging and
+such are collected, and because interrupt time is collected, this is
+useful for generally watching a system to help find problem and
+eliminate bottlenecks.
+
+
+Task Information
+----------------
+The following time values are kept for tasks:
+
+ONCPU_USER      Time spent running in userland
+ONCPU_SYS       Time spent running in the kernel on behalf of the task
+INTERRUPTIBLE   Time spent in an interruptible wait
+UNINTERRUPTIBLE Time spent in an uninterruptible wait
+INTERRUPTED     Time the task was interrupted by an interrupt
+RUNQUEUE        Time spent on the run queue
+STOPPED         Time in stopped state
+ZOMBIE          Time in zombie state
+SLP_POLL        Time spent in select/poll/etc.
+SLP_PAGING      Time spent waiting for data to be paged in/out.
+SLP_FUTEX       Time spent waiting on a futex.
+
+This information can be fetched in two different ways: via a syscall
+and via the proc filesystem.
+
+The msa syscall has the following format:
+
+	msa(int ntimers, int which, msa_time_t *timers)
+
+ntimers is the number of timers to fetch, and the more common timers are
+first in the array.
+
+which can be MSA_SELF for the all threads in the running process, MSA_THREAD
+for the running thread, and MSA_CHILDREN for all child processes.
+
+timers is an array of time values, in nanoseconds, indexed by the
+msa_thread_state enum.  This is returned.
+
+Each process has an "msa" file in /proc/<pid>/... directory, and each
+thread has one, too.  This contains information in the format:
+
+ State:      Poll
+ Now:              232598740315
+ ONCPU_USER              1261115
+ ONCPU_SYS           10385737584
+ INTERRUPTIBLE          70269326
+ UNINTERRUPTIBLE     26479449181
+ INTERRUPTED            33478535
+ RUNQUEUE                  31424
+ STOPPED                       0
+ ZOMBIE                        0
+ SLP_POLL            93200925229
+ SLP_PAGING            245287043
+ SLP_FUTEX                     0
+
+Where "State" shows the current state and "Now" is the current MSA
+time value.
+
+
+Interrupt Information
+---------------------
+
+/proc/msa_irq_time contains information about time spent in each
+interrupt on each cpu, in the format:
+
+Now:   3464616756951
+                 CPU0            CPU1
+ 48:           263050               0
+ 49:            13799               0
+ 51:          6957282               0
+ 60:            23524               0
+ 62:           155218               0
+ 73:         33442572               0
+ 81:         65786233               0
+ 89:             5586               0
+239:        928126476       817359081
+251:         28414698        79626107
+
+"Now" is the current MSA time value, and the values are the time in
+nanoseconds spent in each interrupt.
+
+
+Clocksource Problems
+--------------------
+
+Obviously, since Microstate Accouting records accurate information at
+the nanosecond level, it needs an accurate, efficient, high-resolution
+clocksource.  This can be an issue.  Some CPU-based clocksources (like
+the TSC on x86 systems) are high resolution but their tick rate
+changes if CPU frequency is scaled, so they are not useful.
+
+In addition, clocksources on SMP system need to be properly
+synchronized on the processors.  Otherwise, if a thread moves from one
+CPU to another, it might see CPU go backwards, which means the time
+will overflow and you will get a very large value.
+
+The standard generic clocksource *should* be ok for Microstate
+Accounting, though it will be less efficient than directly using a CPU
+clock.  However, sometimes it still has issues.  Buggy ACPI_PM clocks
+might not be properly synchronized.  If a jiffies timer is used, it
+will be extremely inaccurate.
+
+If you do have problems with strange values, you can enable
+MICROSTATE_ACCT_TIMEPROB_DETECT to see if you are having a problem.
+If the Microstate Accouting code sees time go backwards, it will
+report the problem.  You can also enable
+MICROSTATE_ACCT_TIMEPROB_WORKAROUND and if time goes backwards, the
+MSA code will "correct" the problem and set the delta from the last
+timestamp to zero instead of a underflow value.
+
+On properly operating systems with the generic clocksource, this
+should not be an issue, but there are plenty of systems that do not
+operate properly.
+
+If you want to improve accuracy and all systems have a properly
+working CPU clocksource, you generally have an option to use that
+timer, depending on the architecture.

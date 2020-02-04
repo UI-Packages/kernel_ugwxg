@@ -1,0 +1,153 @@
+#
+# IPMI device configuration
+#
+
+menuconfig IPMI_HANDLER
+       tristate 'IPMI top-level message handler'
+       depends on HAS_IOMEM
+       default y if ACPI
+       help
+         This enables the central IPMI message handler, required for IPMI
+	 to work.
+
+         IPMI is a standard for managing sensors (temperature,
+         voltage, etc.) in a system.
+
+         See <file:Documentation/IPMI.txt> for more details on the driver.
+
+	 If unsure, say N.
+
+if IPMI_HANDLER
+
+config IPMI_PANIC_EVENT
+       bool 'Generate a panic event to all BMCs on a panic'
+       help
+         When a panic occurs, this will cause the IPMI message handler to
+	 generate an IPMI event describing the panic to each interface
+	 registered with the message handler.
+
+config IPMI_PANIC_STRING
+	bool 'Generate OEM events containing the panic string'
+	depends on IPMI_PANIC_EVENT
+	help
+	  When a panic occurs, this will cause the IPMI message handler to
+	  generate IPMI OEM type f0 events holding the IPMB address of the
+	  panic generator (byte 4 of the event), a sequence number for the
+	  string (byte 5 of the event) and part of the string (the rest of the
+	  event).  Bytes 1, 2, and 3 are the normal usage for an OEM event.
+	  You can fetch these events and use the sequence numbers to piece the
+	  string together.
+
+config IPMI_DEVICE_INTERFACE
+       tristate 'Device interface for IPMI'
+       help
+         This provides an IOCTL interface to the IPMI message handler so
+	 userland processes may use IPMI.  It supports poll() and select().
+
+config IPMI_SI
+       tristate 'IPMI System Interface handler'
+       default y if ACPI
+       help
+         Provides a driver for System Interfaces (KCS, SMIC, BT).
+	 Currently, only KCS and SMIC are supported.  If
+	 you are using IPMI, you should probably say "y" here.
+
+config IPMI_SI_PROBE_DEFAULTS
+       bool 'Probe for all possible IPMI system interfaces by default'
+       default n
+       depends on IPMI_SI
+       help
+	 Modern systems will usually expose IPMI interfaces via a discoverable
+	 firmware mechanism such as ACPI or DMI. Older systems do not, and so
+	 the driver is forced to probe hardware manually. This may cause boot
+	 delays. Say "n" here to disable this manual probing. IPMI will then
+	 only be available on older systems if the "ipmi_si_intf.trydefaults=1"
+	 boot argument is passed.
+
+config IPMI_SMB
+       tristate 'IPMI SMBus handler'
+       select I2C
+       help
+         Provides a driver for a SMBus interface to a BMC, meaning that you
+	 have a driver that must be accessed over an I2C bus instead of a
+	 standard interface.  This module requires I2C support.  Note that
+	 you might need some I2C changes if CONFIG_IPMI_PANIC_EVENT is
+	 enabled along with this, so the I2C driver knows to run to
+	 completion during sending a panic event.
+
+config IPMI_SERIAL
+       tristate 'IPMI Serial Interface'
+       depends on SERIAL_CORE
+       help
+	System Interface handler to support serial interface
+	to the BMC.  Unless your device has a serial interface to the BMC
+	you should probably say "n" here.
+
+config SERIAL_IPMI_SETUP
+	string 'Default serial IPMI interface setup'
+	depends on IPMI_SERIAL
+	default ""
+	help
+	 Set the default Serial interface parameters in the format:
+	 port,<baud><parity><bits><flow>,<codec_name>,<codec_parms
+	 For example: ttyS1,38400n8,TerminalMode,pp
+	 This value can be over written in the kernel command line with
+	 ipmi_serial.port_info=... or as a module parameter.
+
+config IPMI_SERIAL_TERMINAL_MODE
+	tristate 'Terminal mode interface for IPMI'
+	depends on IPMI_SERIAL
+	default n
+	help
+	  Enable the terminal mode codec for IPMI serial.  This implements
+	  the terminal mode serial interface as described in the IPMI
+	  specification.  This codec takes one option: "pp" (or "nopp")
+	  to force enabling (or not enabling) PigeonPoint-specific
+	  handling of echo.  Some boards are auto-detected for this, but
+	  if you have a PigeonPoint controller and it's not autodetected,
+	  you can force it on.
+
+config IPMI_SERIAL_DIRECT
+	tristate 'Direct mode interface for IPMI'
+	depends on IPMI_SERIAL
+	default n
+	help
+	  Enable the direct mode codec for IPMI serial.  This implements
+	  the direct mode serial interface as described in the IPMI
+	  specification.
+
+config IPMI_SERIAL_RADISYS_ASCII
+	tristate 'Radisys ASCII interface for IPMI'
+	depends on IPMI_SERIAL
+	default n
+	help
+	  Enable the Radisys ASCII codec for IPMI serial.  This
+	  implements a codec for serial interfaces for some Radisys
+	  ATCA cards.
+
+config IPMI_WATCHDOG
+       tristate 'IPMI Watchdog Timer'
+       help
+         This enables the IPMI watchdog timer.
+
+config IPMI_POWEROFF
+       tristate 'IPMI Poweroff'
+       help
+         This enables a function to power off the system with IPMI if
+	 the IPMI management controller is capable of this.
+
+config IPMI_EMULATE_RADISYS
+       tristate 'Emulate Radisys IPMI driver'
+       depends on IPMI_HANDLER
+       help
+         This enables emulation of the Radisys IPMI device driver.
+
+config IPMI_EMULATE_IMB
+       tristate 'Emulate Intel IBM driver'
+       depends on IPMI_HANDLER && IPMI_WATCHDOG
+       help
+         This enables emulation of the Intel IMB device driver.  Note that you
+	 MUST have the IPMI watchdog timer enabled to use this.  This code
+	 uses some of the watchdog code.
+
+endif # IPMI_HANDLER

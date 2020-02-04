@@ -1,0 +1,30 @@
+menu "PCI host controller drivers"
+	depends on PCI
+
+config PCI_MVEBU
+	bool "Marvell EBU PCIe controller"
+	depends on ARCH_MVEBU || ARCH_KIRKWOOD
+
+config PCIE_DW
+	bool
+
+config PCI_EXYNOS
+	bool "Samsung Exynos PCIe controller"
+	depends on SOC_EXYNOS5440
+	select PCIEPORTBUS
+	select PCIE_DW
+
+config PCI_THUNDER_PEM
+       bool
+
+config PCI_THUNDER
+	bool "Thunder PCIe host controller"
+	depends on ARM64 || COMPILE_TEST
+	depends on OF_PCI
+	depends on PCI_MSI
+	select PCI_THUNDER_PEM
+	help
+	  Say Y here if you want internal PCI support on Thunder SoC.
+	  There are 4 internal PCI controllers available.
+
+endmenu

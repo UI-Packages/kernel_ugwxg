@@ -1,0 +1,385 @@
+/*
+ * SAMSUNG SMDK5250 board device tree source
+ *
+ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+ *		http://www.samsung.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+*/
+
+/dts-v1/;
+#include "exynos5250.dtsi"
+
+/ {
+	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
+	compatible = "samsung,smdk5250", "samsung,exynos5250";
+
+	aliases {
+	};
+
+	memory {
+		reg = <0x40000000 0x80000000>;
+	};
+
+	chosen {
+		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
+	};
+
+	i2c@12C60000 {
+		samsung,i2c-sda-delay = <100>;
+		samsung,i2c-max-bus-freq = <20000>;
+
+		eeprom@50 {
+			compatible = "samsung,s524ad0xd1";
+			reg = <0x50>;
+		};
+	};
+
+	vdd:fixed-regulator@0 {
+		compatible = "regulator-fixed";
+		regulator-name = "vdd-supply";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+	};
+
+	dbvdd:fixed-regulator@1 {
+		compatible = "regulator-fixed";
+		regulator-name = "dbvdd-supply";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+
+	spkvdd:fixed-regulator@2 {
+		compatible = "regulator-fixed";
+		regulator-name = "spkvdd-supply";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-always-on;
+	};
+
+	vdd11:fixed-regulator@3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vdd11-supply";
+		regulator-min-microvolt = <1100000>;
+		regulator-max-microvolt = <1100000>;
+		regulator-always-on;
+	};
+
+	vdd18:fixed-regulator@4 {
+		compatible = "regulator-fixed";
+		regulator-name = "vdd18-supply";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+	};
+
+	i2c@12C70000 {
+		samsung,i2c-sda-delay = <100>;
+		samsung,i2c-max-bus-freq = <20000>;
+
+		eeprom@51 {
+			compatible = "samsung,s524ad0xd1";
+			reg = <0x51>;
+		};
+
+		wm8994: wm8994@1a {
+			 compatible = "wlf,wm8994";
+			 reg = <0x1a>;
+		};
+	};
+
+	i2c@121D0000 {
+		samsung,i2c-sda-delay = <100>;
+		samsung,i2c-max-bus-freq = <40000>;
+		samsung,i2c-slave-addr = <0x38>;
+
+		sata-phy {
+			compatible = "samsung,sata-phy";
+			reg = <0x38>;
+		};
+	};
+
+	sata@122F0000 {
+		samsung,sata-freq = <66>;
+	};
+
+	i2c@12C80000 {
+		samsung,i2c-sda-delay = <100>;
+		samsung,i2c-max-bus-freq = <66000>;
+
+		hdmiddc@50 {
+			compatible = "samsung,exynos4210-hdmiddc";
+			reg = <0x50>;
+		};
+	};
+
+	i2c@12C90000 {
+		status = "disabled";
+	};
+
+	i2c@12CA0000 {
+		status = "disabled";
+	};
+
+	i2c@12CB0000 {
+		status = "disabled";
+	};
+
+	i2c@12CC0000 {
+		status = "disabled";
+	};
+
+	i2c@12CD0000 {
+		status = "disabled";
+	};
+
+	i2c@12CE0000 {
+		samsung,i2c-sda-delay = <100>;
+		samsung,i2c-max-bus-freq = <66000>;
+
+		hdmiphy@38 {
+			compatible = "samsung,exynos4212-hdmiphy";
+			reg = <0x38>;
+		};
+	};
+
+	dwmmc0@12200000 {
+		num-slots = <1>;
+		supports-highspeed;
+		broken-cd;
+		fifo-depth = <0x80>;
+		card-detect-delay = <200>;
+		samsung,dw-mshc-ciu-div = <3>;
+		samsung,dw-mshc-sdr-timing = <2 3>;
+		samsung,dw-mshc-ddr-timing = <1 2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+
+		slot@0 {
+			reg = <0>;
+			bus-width = <8>;
+		};
+	};
+
+	dwmmc1@12210000 {
+		status = "disabled";
+	};
+
+	dwmmc2@12220000 {
+		num-slots = <1>;
+		supports-highspeed;
+		fifo-depth = <0x80>;
+		card-detect-delay = <200>;
+		samsung,dw-mshc-ciu-div = <3>;
+		samsung,dw-mshc-sdr-timing = <2 3>;
+		samsung,dw-mshc-ddr-timing = <1 2>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+
+		slot@0 {
+			reg = <0>;
+			bus-width = <4>;
+			disable-wp;
+		};
+	};
+
+	dwmmc3@12230000 {
+		status = "disabled";
+	};
+
+	spi_0: spi@12d20000 {
+		status = "disabled";
+	};
+
+	spi_1: spi@12d30000 {
+		w25q80bw@0 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "w25x80";
+			reg = <0>;
+			spi-max-frequency = <1000000>;
+
+			controller-data {
+				cs-gpio = <&gpa2 5 0>;
+				samsung,spi-feedback-delay = <0>;
+			};
+
+			partition@0 {
+				label = "U-Boot";
+				reg = <0x0 0x40000>;
+				read-only;
+			};
+
+			partition@40000 {
+				label = "Kernel";
+				reg = <0x40000 0xc0000>;
+			};
+		};
+	};
+
+	spi_2: spi@12d40000 {
+		status = "disabled";
+	};
+
+	hdmi {
+		hpd-gpio = <&gpx3 7 0>;
+	};
+
+	codec@11000000 {
+		samsung,mfc-r = <0x43000000 0x800000>;
+		samsung,mfc-l = <0x51000000 0x800000>;
+	};
+
+	i2s0: i2s@03830000 {
+		status = "okay";
+	};
+
+	i2s1: i2s@12D60000 {
+		status = "disabled";
+	};
+
+	i2s2: i2s@12D70000 {
+		status = "disabled";
+	};
+
+	sound {
+		compatible = "samsung,smdk-wm8994";
+
+		samsung,i2s-controller = <&i2s0>;
+		samsung,audio-codec = <&wm8994>;
+	};
+
+	usb@12110000 {
+		samsung,vbus-gpio = <&gpx2 6 0>;
+	};
+
+	dp-controller {
+		samsung,color-space = <0>;
+		samsung,dynamic-range = <0>;
+		samsung,ycbcr-coeff = <0>;
+		samsung,color-depth = <1>;
+		samsung,link-rate = <0x0a>;
+		samsung,lane-count = <4>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&dp_hpd>;
+		lcd_bl_gpio = <&gpb2 0 1>;
+		lcd_en_gpio = <&gpx1 5 1>;
+	};
+
+	fimd {
+		display-timings {
+			native-mode = <&timing1>;
+			timing0: timing@0 {
+				/* 1280x800 */
+				clock-frequency = <50000>;
+				hactive = <1280>;
+				vactive = <800>;
+				hfront-porch = <4>;
+				hback-porch = <4>;
+				hsync-len = <4>;
+				vback-porch = <4>;
+				vfront-porch = <4>;
+				vsync-len = <4>;
+			};
+			timing1: timing@1 {
+				/* 800x1280 */
+				clock-frequency = <266000000>;
+				hactive = <800>;
+				vactive = <1280>;
+				hfront-porch = <11>;
+				hback-porch = <3>;
+				hsync-len = <2>;
+				vback-porch = <11>;
+				vfront-porch = <3>;
+				vsync-len = <2>;
+			};
+			timing2: timing@2 {
+				/* 2560x1600 */
+				clock-frequency = <266000000>;
+				hactive = <2560>;
+				vactive = <1600>;
+				hfront-porch = <48>;
+				hback-porch = <80>;
+				hsync-len = <32>;
+				vback-porch = <16>;
+				vfront-porch = <8>;
+				vsync-len = <6>;
+			};
+		};
+	};
+
+	fixed-rate-clocks {
+		xxti {
+			compatible = "samsung,clock-xxti";
+			clock-frequency = <24000000>;
+		};
+	};
+
+	lcd_mipi_dsi_s6e8ax0: lcd_panel_s6e8ax0 {
+		lcd-htiming = <11 3 2 800>;
+		lcd-vtiming = <11 3 2 1280>;
+	};
+
+	mipi_lcd_s6e8ax0: mipi-lcd@s6e8ax0 {
+		compatible = "s6e8ax0";
+		lcd-name = "s6e8ax0";
+		lcd_enabled = <1>;
+		reset-delay = <50>;
+		power-on-delay = <120>;
+		power-off-delay = <200>;
+		gpio-reset = <&gpx1 5 0 0 0>;
+		gpio-power = <&gpx3 0 0 0 0>;
+		gpio-bl = <&gpb2 0 0 0 0>;
+	};
+
+	mipi_dsim_phy: mipi-phy@exynos5250 {
+		compatible = "samsung-exynos,mipi-phy-type1";
+		reg_enable_dphy = <0x10040714>;
+		mask_enable_dphy = <0x00000001>;
+		reg_reset_dsim = <0x10040714>;
+		mask_reset_dsim = <0x00000004>;
+	};
+
+	mipi-dsim {
+		status = "okay";
+		mipi-lcd = <&mipi_lcd_s6e8ax0>;
+		mipi-phy = <&mipi_dsim_phy>;
+		enabled = <0>;
+		panel-info = <&lcd_mipi_dsi_s6e8ax0>;
+
+		vdd11-supply = <&vdd11>;
+		vdd18-supply = <&vdd18>;
+		vdd3-supply = <&vdd18>;
+		vci-supply = <&vdd18>;
+
+		mipi-config {
+			e_interface = <1>;
+			e_pixel_format = <7>;
+			auto_flush = <0>;
+			eot_disable = <0>;
+			auto_vertical_cnt = <0>;
+			hse = <0>;
+			hfp = <0>;
+			hbp = <0>;
+			hsa = <0>;
+			e_no_data_lane = <3>;
+			e_byte_clk = <0>;
+			e_burst_mode = <1>;
+			p = <3>;
+			m = <115>;
+			s = <1>;
+			pll_stable_time = <500>;
+			esc_clk = <7000000>;
+			stop_holding_cnt =<0x0fff>;
+			bta_timeout = <0xff>;
+			rx_timeout = <0xffff>;
+			e_virtual_ch = <0>;
+			cmd_allow = <0x1>;
+		};
+	};
+};

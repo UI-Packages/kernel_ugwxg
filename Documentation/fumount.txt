@@ -1,0 +1,64 @@
+FUMOUNT
+
+If you enable CONFIG_FUMOUNT, you can forcibly unmount filesystems,
+even if they have users.  This is useful if you really need to safely
+unmount that disk, not matter what.
+
+Users of files that have been forcably unmounted will get EBADF errors
+if they try to use those files.  Programs trying to open files on the
+filesystem will get ENOENT during the process, as if the filesystem
+wasn't there.  Any programs with files mapped into memory will get a
+SIGSEGV if they try to access that memory.
+
+There is a '-F' option added to the umount command to accomplish this.
+
+
+HOW IT WORKS
+------------
+
+Fumount works in three stages:
+
+    * Mark the filesystem as in fumount, then use RCU wait for anyone
+      who might be opening a file to get out of that section.  After
+      this completes, the filesystem will still be mounted and visible,
+      but no one can open a file on it any more.
+
+    * Go through all the files opened by the filesystem and mark them
+      as in fumount.  After this, any users of a file open on the
+      filesystem will get an EBADF if they try to use the file.  Wake
+      anything waiting on a fifo.
+
+    * Spin every second and do the following until the filesystem has
+      no users left.
+
+      1) For any file that is still being processed by the kernel (it is
+         someplace where an fget() has been done but not an fput(), find
+	 any locks or memory maps for the file and remove the memory maps
+	 and kick the threads waiting on locks.
+
+      2) Scan the filesystem for any file that is no longer being processed
+         and shut it down.  After this happens, the only thing the process
+	 can do is close the file.
+
+Note that the process must still close their file descriptors, they are not
+automatically closed.  They just won't work any more.
+
+
+CAVEATS
+-------
+
+Notice that this process requires that waiting threads that are kicked
+run to get out of some region of code.  If you are in a situation
+where these threads won't run, they fumount will not work.
+
+Fumount will not work on /, and it will not work on filesystems that
+have mounts on them.
+
+Fumount does/may not work on the following filesystems because they have
+->flush code and it uses the id:
+
+	cifs (does not use ID, still need to check)
+	ecryptfs (does not use ID, still need to check)
+	exofs (does not use ID, still need to check)
+	fuse
+	nfs (does not use ID, still need to check)

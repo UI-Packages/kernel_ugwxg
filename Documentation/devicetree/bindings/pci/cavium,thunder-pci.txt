@@ -1,0 +1,32 @@
+* Cavium Thunder PCIe interface
+
+Required properties:
+- compatible: should contain "cavium,thunder-pcie" to identify the core.
+- device_type: set to "pci"
+- #address-cells: set to <3>
+- #size-cells: set to <2>
+- #stream-id-cells: set to <1>
+- bus-range: PCI bus numbers covered
+- reg: base address and length of the pcie configuration space.
+- ranges: ranges for the PCI memory regions.
+- msi-parent: Link to the hardware entity that serves as the Message
+  Signaled Interrupt controller for this PCI controller.
+
+Example:
+
+SoC specific DT Entry:
+
+	pcie0: pcie0@0x848000000000 {
+		compatible = "cavium,thunder-pcie";
+		device_type = "pci";
+		msi-parent = <&its>;
+		bus-range = <0 255>;
+		#size-cells = <2>;
+		#address-cells = <3>;
+		#stream-id-cells = <1>;
+		reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
+		ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>, /* mem */
+			<0x03000000 0x8300 0x00000000 0x8300 0x00000000 0x80 0x00000000>,
+			<0x03000000 0x87e0 0x00000000 0x87e0 0x00000000 0x01 0x00000000>;
+	};
+
